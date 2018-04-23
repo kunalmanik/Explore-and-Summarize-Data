@@ -1,0 +1,850 @@
+Explore and Summarize Data by KUNAL MANIK
+========================================================
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(GGally)
+library(lubridate)
+
+```
+
+# Data Set (Referred by Udacity)- *Loan Data from Prosper*
+
+----------------------------------------------------
+
+```{r echo=FALSE, Load_the_Data}
+# Loading the data
+loan_df <- read.csv('prosperLoanData.csv', sep = ',', stringsAsFactors=FALSE)
+```
+
+----------------------------------------------------
+
+# Summary of the Data Set
+
+*"This data set contains 113,937 loans with 81 variables on each loan, including loan amount, borrower rate (or interest rate), current loan status, borrower income, borrower employment status, borrower credit history, and the latest payment information."* - as stated on discription.
+
+```{r echo=FALSE, "Data set dimensions"}
+dim(loan_df) 
+```
+
+Following is the list of all the 81 variables:
+
+```{r echo=FALSE, "Variable Names"}
+names(loan_df)  
+```
+
+Variables:
+
+```{r echo=FALSE, "Variables Overview"}
+str(loan_df)  
+```
+
+----------------------------------------------------
+
+# Univariate Plots Section
+
+```{r echo=FALSE, "Range of the Listing Creation Date"}
+range(loan_df$ListingCreationDate)
+```
+
+I've noticed that a few variables are valid only for loans created post July 2009. Thus, we calculate percentage/number of those loans that were created before the mentioned date.
+
+**Loans created before July 2009**
+
+```{r echo=FALSE,  "How many loans were created before July 2009"}
+
+date_01_07_09 <- "2009-07-01"
+
+table(date_01_07_09 > loan_df$ListingCreationDate,
+      dnn = "Number of loans before July 1st, 2009")
+
+table(date_01_07_09 > loan_df$ListingCreationDate,
+      dnn = "Percentage of loans before July 1st, 2009") /
+    length(loan_df$ListingCreationDate) * 100
+```
+
+25.52639% loans don't have values for a few parameters.
+
+```{r echo=FALSE, "New variables and data frames"}
+
+loan_df$CreationYearList <- year(loan_df$ListingCreationDate)
+loan_df$CreationYearList <- as.factor(loan_df$CreationYearList)
+
+
+loan_df$MonthlyDebt <- loan_df$DebtToIncomeRatio * loan_df$StatedMonthlyIncome
+
+
+categoryListIndex <- c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 
+           11, 12, 13, 14, 15, 16, 17, 18, 19, 20)
+categoryListValues <- c("Not Available", "Debt Consolidation", 
+                           "Home Improvement", "Business", "Personal Loan", 
+                           "Student Use", "Auto", "Other", "Baby&Adoption", 
+                           "Boat", "Cosmetic Procedure",  "Engagement Ring", 
+                           "Green Loans", "Household Expenses",  
+                           "Large Purchases", "Medical/Dental", "Motorcycle",
+                           "RV", "Taxes", "Vacation", "Wedding Loans")
+
+loan_df$CategoryNameList <- 
+  categoryListValues[match(loan_df$ListingCategory..numeric., 
+                              categoryListIndex)]
+
+incomeRanges <- c('Not displayed', 'Not employed',
+                  '$0','$1-24,999', '$25,000-49,999',
+                  '$50,000-74,999', '$75,000-99,999', 
+                  '$100,000+')
+
+loan_df$IncomeRange <- factor(loan_df$IncomeRange, levels = incomeRanges)
+
+
+loansAfter_01_07_09 <- subset(loan_df, 
+                             loan_df$ListingCreationDate > date_01_07_09)
+
+loansBefore_01_07_09 <- subset(loan_df, 
+                              loan_df$ListingCreationDate < date_01_07_09)
+```
+
+**Distribution of loans**
+
+```{r echo=FALSE, "Listing Creation Year"}
+ggplot(aes(x = CreationYearList), data = loan_df) + 
+  stat_count() +  
+  ggtitle("Loan count by Year") +
+  xlab("Year")
+```
+
+The number of loansalmost doubled from 2006 to 2007, then remained almost equal (a little drop in numbers) in 2008 and suffered a drastic decrease in numbers in 2009. The numbers looked solid post 2012 especially in year 2013, the highest for the data available.
+
+```{r echo=FALSE, "Listing Creation Quarter"}
+quaterDist = unique(loan_df$LoanOriginationQuarter) 
+quaterDist = quaterDist[order(substring(quaterDist,4,7), substring(quaterDist,1,2))]
+
+ggplot(aes(x = LoanOriginationQuarter), data = loan_df) + 
+  stat_count() +
+  scale_x_discrete(limits= quaterDist) +
+  ggtitle("Loan Distribution by Quarter") +
+  xlab("Yearly Quarters") +
+  theme(text = element_text(size=10), 
+        axis.text.x = element_text(angle=90, vjust=1))  
+```
+
+**Borrowing Amount**
+
+```{r echo=FALSE, "Borrowing Amount"}
+
+summary(loan_df$LoanOriginalAmount)
+
+ggplot(aes(x = LoanOriginalAmount), data = loan_df) + 
+  #geom_histogram(binwidth=300, color='red') +
+  #geom_histogram(binwidth=400, color='red') +
+  #geom_histogram(binwidth=500, color='red') +
+  geom_histogram(binwidth=1000, color='red') +
+  #geom_histogram(binwidth=5000, color='red') +
+  ggtitle("Loan Amount") +
+  xlab("Loan Amount")
+
+```
+
+
+**Most frequent loan term**
+
+```{r echo=FALSE, "Most frequent loan term"}
+ggplot(aes(x = Term), data = loan_df) + 
+  stat_count() +  
+  ggtitle("Loans by Term") +
+  xlab("Term") +
+  scale_x_discrete(limits= c(unique(loan_df$Term)))
+
+table(loan_df$Term)
+
+summary(loan_df$Term)
+```
+
+The most frequent term is 36 months (3 years).
+
+```{r echo=FALSE, "Borrowing Reason"}
+ggplot(aes(x = CategoryNameList), data = loan_df) + 
+  stat_count(color='black') +
+  ggtitle("Reasons for Loans") +
+  xlab("Reason") +
+  theme(text = element_text(size=10), 
+        axis.text.x = element_text(angle=90, vjust=1)) 
+
+```
+
+Debt Consolidation is the reason for maximum number of loans.
+
+```{r echo=FALSE, "Loans without ListingCategory" }
+loansWithoutListingCategory <- 
+  subset(loan_df, 
+         ListingCategory..numeric. == '0')[c('ListingCreationDate', 
+                                             'CreationYearList', 
+                                             'ListingCategory..numeric.')]
+
+table(loansWithoutListingCategory$CreationYearList)
+```
+
+Most of the loans without any Listing category were created in 2006 and 2007, 6213 and 10709 respectively. Only 20 loans were created from 2011 to 2014 and 23 were created in 2005 (with the data that is available).
+
+**Monthly Loan Payment**
+
+```{r echo=FALSE, "Monthly Loan Payment"}
+ggplot(aes(x = MonthlyLoanPayment), data = loan_df) + 
+  geom_histogram(fill = "#B1C192", color='black', binwidth = 20) +
+  ggtitle("Monthly Loan Payment") +
+  xlab("Monthly Loan Payment")
+
+summary(loan_df$MonthlyLoanPayment)
+
+# Using square root of Monthly Loan Payment
+ggplot(aes(x = sqrt(MonthlyLoanPayment)), data = loan_df) + 
+  geom_histogram(fill = "#B1C192", color='black', binwidth = 2) +
+  ggtitle("Monthly Loan Payment") +
+  xlab("Monthy Loan Payment (square-rooted)")
+```
+
+Distribution appears to be "Normal".
+
+**Annual Income of Borrowers**
+
+```{r echo=FALSE, "Annual Income of Borrowers"}
+ggplot(aes(x = IncomeRange), data = loan_df) + 
+  stat_count(fill = "#B1C192") +
+  geom_text(stat="count", aes(label = ..count..)) +
+  ggtitle("Annual income of borrowers")  +
+  xlab("Income Range") +
+  theme(text = element_text(size=10), 
+        axis.text.x = element_text(angle=90, vjust=1))
+```
+
+Most of the borrowers have annual income falling in the range of 25,000 to 74,999 Dollars. 
+
+**Distribution of Monthly Debt**
+
+```{r echo=FALSE, "Distribution of Monthly Debt"}
+ggplot(aes(x = MonthlyDebt), data = subset(loan_df, MonthlyDebt < 6000)) +
+  geom_histogram(fill = "#B1C192", color='black', binwidth = 70) +  
+  ggtitle("Monthly Debt") +
+  xlab("Monthly Debt") +
+  scale_x_continuous(breaks=seq(0, 6000, 500))
+
+summary(loan_df$MonthlyDebt)
+summary(subset(loan_df, MonthlyDebt < 6000)$MonthlyDebt)
+
+```
+
+The graph appears to be skewed.
+
+**Employment Status of the Borrowers**
+
+```{r echo=FALSE, "Employment Status of the Borrowers"}
+ggplot(aes(x = EmploymentStatus), data = loan_df) + 
+  stat_count(fill = "#B1C192") +
+  geom_text(stat="count", aes(label = ..count..)) +
+  ggtitle("Employment Status of the borrowers")  +
+  xlab("Employment Status") +
+  theme(text = element_text(size=10), 
+        axis.text.x = element_text(angle=0, vjust=1))
+```
+
+
+```{r echo=FALSE}
+loan_df$StateOfEmployment <- ifelse(
+  loan_df$EmploymentStatus == 'Self-employed' |
+  loan_df$EmploymentStatus == 'Employed' |  
+  loan_df$EmploymentStatus == 'Full-time' | 
+  loan_df$EmploymentStatus == 'Part-time', 
+  c("employed"), 
+  c("unemployed")) 
+
+table(loan_df$StateOfEmployment)
+```
+
+**Employment Status - Duration**
+
+```{r echo=FALSE, warning=FALSE, "Employment Status - Duration" }
+ggplot(aes(x = EmploymentStatusDuration/12), data = loan_df) + 
+  geom_histogram(binwidth=1, fill = "#B1C192", color='black') +
+  ggtitle("Employment Duration of the borrowers") +
+  xlab("Employment duration (years)") +
+  theme(text = element_text(size=10))
+```
+
+People with longer duration of employment are less likely to apply for a loan.
+
+**Occupation of Borrowers**
+
+```{r echo=FALSE, "Occupation of Borrowers" }
+occupationGroup_df <- group_by(loan_df, Occupation)
+borrowers <- summarise(occupationGroup_df, count = n())
+borrowers <- 
+  borrowers[order(-borrowers$count),]
+
+#head(borrowers)
+#head(borrowers, 10)
+
+borrowers <- subset(borrowers, 
+                    Occupation != "Other" & Occupation != "")
+
+head(borrowers, 10)
+
+occupations <- unique((head(borrowers, 10))$Occupation)
+
+Occupations_Top10 <- subset(loan_df, 
+                           (Occupation %in% occupations))
+```
+
+28617 loans have Other as value for occupation. 
+
+```{r echo=FALSE, "Loans without Occupation" }
+loansWithoutOccupation <- 
+  subset(loan_df, 
+         Occupation == '')[c('Occupation',
+                       'EmploymentStatus',
+                       'CreationYearList')]
+
+table(loansWithoutOccupation$CreationYearList)
+
+table(loansWithoutOccupation$EmploymentStatus)
+```
+
+No Occupation exists for loans created between 2005 and 2007, no employment status available. Employment status is "Other" for years 2013 to 2014 for the given numbers above.
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(aes(x = Occupation), data = Occupations_Top10) + 
+  stat_count(fill = "#B1C192") +
+  geom_text(stat="count", aes(label = ..count..)) +
+  ggtitle("Top 10 Occupations of Borrowers") +
+  theme(text = element_text(size=10), 
+        axis.text.x = element_text(angle=90, vjust=1))
+```
+
+**Borrowers' States**
+
+```{r echo=FALSE, warning=FALSE}
+borrowerStateGroup_df <- group_by(loan_df, BorrowerState)
+borrowersState <- summarise(borrowerStateGroup_df, count = n())
+borrowersState <- borrowersState[order(-borrowersState$count),]
+
+states <- unique((head(borrowersState, 11))$BorrowerState)
+
+top10States <- subset(loan_df,  (BorrowerState %in% states))
+```
+
+```{r echo=FALSE}
+loansWithoutState <- subset(loan_df, 
+    BorrowerState == '')[c('ListingCreationDate', 
+                           'CreationYearList', 
+                           'BorrowerState')]
+
+loansWithoutState$ListingCreationDate <- 
+  as.Date(loansWithoutState$ListingCreationDate)
+
+loansWithoutState <- 
+  loansWithoutState[rev(order(loansWithoutState$ListingCreationDate)),]
+
+table(loansWithoutState$CreationYearList)
+```
+
+All of the loans without any borrower state were available before 2009. 
+
+```{r echo=FALSE}
+ggplot(aes(x = BorrowerState), data = subset(top10States, BorrowerState != '')) + 
+  stat_count(fill="#B1C192") +
+  ggtitle("TOP 10 States") +
+  theme(text = element_text(size=10)) +
+  xlab("Borrower State")
+```
+
+**Prosper Ratings for the borrowers**
+
+```{r echo=FALSE, warning=FALSE }
+ggplot(aes(x = ProsperRating..Alpha.), data = loan_df) + 
+  stat_count(fill = "#B1C192") +
+  geom_text(stat="count", aes(label = ..count..)) +
+  ggtitle("Prosper Rating of the borrowers")  +
+  xlab("Prosper Rating") +
+  scale_x_discrete(limits= c('', 'AA', 'A', 'B','C', 'D', 'E', 'HR'))
+```
+
+Most of the borrowers have prosper rating between A and D. AA is the most rare Prosper Rating 
+
+No Prosper Rating is available for the loans before July 2009.
+
+```{r echo=FALSE, warning=FALSE, "Prosper Score of the borrowers"}
+ggplot(aes(x = factor(ProsperScore)), data = loan_df) + 
+  geom_bar() +  
+  ggtitle("Prosper Score of the borrowers") +
+  xlab("Prosper Score")
+
+summary(loan_df$ProsperScore)
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+ggplot(aes(x = factor(TotalProsperLoans)), data = loan_df) + 
+  stat_count() +
+  ggtitle("Total Number of existing Prosper Loans") +
+  xlab("Existing Prosper Loans") +
+  theme(text = element_text(size=10)) +
+  scale_x_discrete(breaks=seq(0, 8, 1))
+
+summary(loan_df$TotalProsperLoans)
+```
+
+**Investors**
+
+```{r echo=FALSE, "Investors"}
+summary(loan_df$Investors)
+```
+
+There is a significant difference in 3rd Qu. and Max. value. Thus, we can conclude that the Max value is an outlier.
+
+**Loans with Recommendations**
+
+```{r echo=FALSE, "Loans with Recommendations"}
+table(loan_df$Recommendations)
+```
+
+109678 loans do not have any recommendation.
+
+**Lender Yield on the Loans**
+
+```{r echo=FALSE, "Lender Yield on the Loans"}
+summary(loan_df$LenderYield)
+
+ggplot(aes(x=LenderYield), data=loan_df) + 
+    geom_histogram(binwidth=0.005, fill = "#B1C192", color='black') +
+    scale_x_continuous(breaks=seq(0, 0.5, 0.05)) + 
+    labs(title="Lender Yield on the Loans") +
+    xlab("Lender Yield")
+```
+
+----------------------------------------------------
+
+# Univariate Analysis
+
+
+# What is the structure of your dataset?
+
+```{r echo=FALSE, "Browse Data"}
+dim(loan_df)
+```
+
+This dataset contains 113937 loans with 85 variables.
+
+
+# What is/are the main feature(s) of interest in your dataset?
+
+In my analysis the main features of interest are:
+
+Number of investors, Borrower rate, Creation Date Listing helped me to understand more about the Prosper dataset and their business along with the distribution of loans over the years.
+
+Prosper Score, Income Range, Loan amount, Loan Category also contribute to the major interests.
+
+
+# What other features in the dataset do you think will help support your investigation into your feature(s) of interest?
+
+Other variables that can help me to support my investigation are Credist Score, Debt To Income Ratio, Prosper Rating, Occupation, Employment Status and Employment Duration.
+
+
+# Did you create any new variables from existing variables in the dataset?
+
+I created the following variables -> CreationYearList, MonthlyDebt, StateOfEmployment, CategoryNameList.
+
+# Of the features you investigated, were there any unusual distributions? Did you perform any operations on the data to tidy, adjust, or change the form of the data? If so, why did you do this?
+
+
+The knowledge of 2008-09 Economic Crisis helped me to relate the fall in the graph values and why was there a sudden dip in the plots.
+  
+I adjusted CreationYearList variable as a factor that would appear discrete.
+
+----------------------------------------------------
+
+# Bivariate Plots Section
+
+## Number of Investors
+
+**Relation between Prosper Score and Number of Investors**
+
+```{r echo=FALSE, "Prosper Score vs Number of Investors"}
+table(loansAfter_01_07_09$ProsperScore,
+      dnn="Number of Loans by Prosper Score")
+
+ggplot(aes(x = as.factor(ProsperScore), y = Investors), 
+       data = loansAfter_01_07_09) + 
+  geom_boxplot() +
+  ggtitle("Prosper Score vs Number of Investors") +
+  xlab("Prosper Score")
+
+```
+
+Plotting Mean Investors value for Prosper Score...
+
+```{r echo=FALSE, "Prosper Score vs Mean of Number of Investors"}
+prosperscore_groups <- group_by(loansAfter_01_07_09, ProsperScore)
+
+loansAfter_01_07_09.investors_by_prosperscore = summarise(prosperscore_groups,
+          investors_mean = mean(Investors),
+          investors_median = median(Investors),
+          n = n())
+
+ggplot(aes(x = ProsperScore, y = investors_mean), 
+       data = loansAfter_01_07_09.investors_by_prosperscore) + 
+  geom_line(color="#ff0000") + 
+  scale_x_continuous(breaks = 1:12) +
+  ggtitle("Prosper Score vs Mean of Number of Investors") +
+  xlab("Prosper Score") +  
+  ylab("Mean_Investors")
+```
+
+The number of investors is grows with prosper score. The peak is reached when prosper score is equal to 10. In this case subset of all loans created after July 1st 2009 is used since Prosper Score was not available for loans created prior to that date.
+
+
+**Relationship between Original Loan Amount and Number of Investors**
+
+```{r echo=FALSE, "Loan Amount vs Number of Investors plot"}
+ggplot(aes(x = LoanOriginalAmount, y = Investors), data = loan_df) + 
+  geom_point(alpha = 1/20) +
+  geom_smooth(method = 'lm', color = 'red') +
+  ggtitle("Original Loan Amount vs Number of Investors") +
+  xlab("Original Loan Amount")
+```  
+
+Larger loans have more investors.
+
+**Relation between Number of Investors and Number of Prosper Loans.**
+
+```{r echo=FALSE, "TotalProsperLoans vs Number of Investors" }
+ggplot(aes(x = as.factor(TotalProsperLoans), y = Investors), 
+       data = subset(loan_df, !is.na(TotalProsperLoans))) + 
+  geom_boxplot() +
+  ggtitle("Total Number Prosper Loans that already exist vs Number of Investors") +
+  xlab("Total Number Prosper Loans that already exist")
+
+summary(loan_df$TotalProsperLoans)
+```
+
+The number of investors on a loan is higher if the borrower has lower number of existing prosper loans.
+
+
+```{r echo=FALSE, "Estimated Loss vs Investors" }
+ggplot(aes(x = EstimatedLoss, y = Investors), data = loansAfter_01_07_09) + 
+  geom_point(alpha = 1/20) +
+  ggtitle("Estimated Loss vs Number of Investors") +
+  xlab("Estimated Loss") 
+
+cor.test(loan_df$EstimatedLoss, loan_df$Investors, method = "pearson")
+
+```
+
+Smaller estimated loss always attracts more Investors.
+
+## Loan Amount Analysis
+
+**Variation in Borrows Loan Amount**
+
+```{r echo=FALSE, "Year/Amount" }
+ggplot(aes(x=as.character(CreationYearList), y=LoanOriginalAmount), 
+       data=loan_df) +
+    geom_boxplot() +
+  ggtitle("Creation Year List vs Original Loan Amount") +
+  xlab("Creation Year List") +
+  ylab("Original Loan Amount")
+
+by(loan_df$LoanOriginalAmount, loan_df$CreationYearList, summary)
+
+```
+
+Mean Loan amount fell deeply in 2009 (4393) and reached the top value in 2013-14; 10610 and 11920 respectively.
+
+**Relation between Loan Amount and Term**
+
+```{r echo=FALSE, "Term/Amount"}
+ggplot(aes(x = as.character(Term), y = LoanOriginalAmount), 
+       data = loan_df) + 
+  geom_boxplot() +
+  ggtitle("Term vs Original Loan Amount") +
+  xlab("Term") +
+  ylab("Original Loan Amount")
+
+by(loan_df$LoanOriginalAmount, loan_df$Term, summary)
+```
+
+Loan amounts are larger for longer terms
+
+**Relation between IncomeRange and Loan Amount**
+
+```{r echo=FALSE, "Income Range vs Loan Amount"}
+ggplot(aes(x = IncomeRange, y = LoanOriginalAmount), data=loan_df) +
+    geom_boxplot() +
+  ggtitle("Income Range  vs Loan Amount") +
+  xlab("Income Range") +
+  theme(text = element_text(size=12), 
+        axis.text.x = element_text(angle=90, vjust=1)) +
+  ylab("Original Loan Amount")
+```
+
+Larger loans tend to relate to larger incomes.
+
+
+**Relationship between Employment Status and Loan Amount**
+
+using StateOfEmployment for this plot.
+
+```{r echo=FALSE, "Employment Status vs Loan Amount"}
+ggplot(aes(x = StateOfEmployment, y = LoanOriginalAmount), data=loan_df) +
+    geom_boxplot() +
+  ggtitle("Employment Status  vs Original Loan Amount") +
+  xlab("Employment Information") +
+  ylab("Original Loan Amount") +
+  theme(text = element_text(size=12), 
+        axis.text.x = element_text(angle=90, vjust=1))
+```
+
+Employed people tend to borrow more money than unemployed people.
+
+
+## Other Variables Analysis
+
+**Monthly Debt vs Current Credit Lines**
+
+Current Credit Lines
+
+```{r echo=FALSE, "CurrentCreditLines Summary"}
+summary(loan_df$CurrentCreditLines)
+```
+
+MonthlyDebt
+
+```{r echo=FALSE, "MonthlyDebt Summary"}
+summary(loan_df$MonthlyDebt)
+```
+
+
+```{r echo=FALSE, warning=FALSE, "CurrentCreditLines"}
+ggplot(aes(x = CurrentCreditLines, y = MonthlyDebt), 
+       data = subset(loan_df, MonthlyDebt != 171000)) + 
+  geom_jitter(alpha = 1/4, shape = 21, fill = I('#B1C192')) +
+  geom_smooth(method = 'lm', color = 'black') +
+  xlim(0,60) +
+  ylim(0,10000) +
+  ggtitle("Monthly Debt vs Current Credit Lines") +
+  xlab("Monthly Debt") +
+  ylab("Current Credit Lines")
+
+cor.test(loan_df$CurrentCreditLines, loan_df$MonthlyDebt, method = "pearson")
+```
+
+As the number of credit lines increases, debt is increasing as well. We have positive correlation of 0.47. 
+
+----------------------------------------------------
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?  
+
+The number of investors increases when the prosper score is high, loan amount is high, borrowers have less existing prosper loans and estimated loss is less.
+
+The lowest mean was \$4393 in 2009 and the top mean value is in 2013-14 \$10610 and \$11920 respectively.
+
+Higher loan amounts usually have longer term and they are related more to employed borrowers with larger incomes than unemployed ones.
+
+
+### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)?
+
+I've observed that employed people borrow more money than the unemployed ones. Also, as the number of credit lines increases, debt increases as well.
+
+
+### What was the strongest relationship you found?
+The strongest relationship I found was between Number of Credit Lines and MonthlyDebt. The relation had positive correlation of 0.47.
+
+----------------------------------------------------
+
+# Multivariate Plots Section
+
+
+**Borrower Rate / Loan Amount / Prosper Rating**
+
+```{r echo=FALSE, "Borrower Rate vs Loan Amount vs Prosper Rating"}
+ggplot(aes(x=BorrowerRate, y = LoanOriginalAmount), data = loansAfter_01_07_09) +
+  geom_point(alpha = 1/20) +
+  ggtitle("Borrower Rate vs Loan Amount (by Prosper Ratings)") +
+  ylab("Loan Amount") +
+  xlab("Borrower Rate") +
+  facet_wrap(~ProsperRating..numeric., ncol=3,  scales = "free") +
+  ylim(0, 35000)
+
+
+```
+
+Loans with high Prosper Rating have low Borrower Rate. Borrowers with low Prosper Rating usually borrow lower amounts but with higher rate. 
+
+
+**Borrower Rate / Loan Amount / Prosper Rating by Income Range**
+
+```{r echo=FALSE, "Loan Amount vs Borrower Rate vs Prosper Rating by Income Range" }
+ggplot(aes(x = BorrowerRate, y = LoanOriginalAmount), 
+       data = loansAfter_01_07_09) +
+  geom_point(aes(color=ProsperRating..numeric.)) +
+  #scale_colour_gradient(low = "red", high = "blue") + 
+  scale_colour_gradient(low = "blue", high = "red") + 
+  ggtitle("Borrower Rate vs Loan Amount vs Prosper Rating by Income Range") +
+  xlab("Borrower Rate") +
+  ylab("Loan Original Amount") +
+  facet_wrap(~IncomeRange, ncol=3,  scales = "free") +
+  xlim(0, 0.4) +
+  ylim(0, 35000)
+```
+
+Higher Income Range and Higher Prosper Rating relates to Lower Borrower Rate. Large Income Range means more loans with higher 
+amount. We can observe that as Risk is Lower for lower Rates.
+
+
+**Borrower Rate / Income Range by Is Borrower Homeowner**
+
+```{r echo=FALSE, "Income Range  vs Borrower Rate vs Homeowners"}
+ggplot(aes(x = as.factor(IncomeRange), y = BorrowerRate), 
+       data = subset(loan_df, 
+                     IncomeRange != 'Not employed' & 
+                       IncomeRange != 'Not displayed'& 
+                       IncomeRange != '$0')) +
+  geom_boxplot(aes(fill = IsBorrowerHomeowner)) +
+  ggtitle("Income Range vs Borrower Rate (by Home Owner)") +
+  guides(fill = guide_legend(title = "Is Borrower Homeowner")) +
+  xlab("Income Range") +
+  ylab("Borrower Rate")  +
+   theme(text = element_text(size=12), 
+        axis.text.x = element_text(angle=90, vjust=1))
+
+```
+
+Borrowers with Higher Income who are Home Owners as well have Lower Borrowing Rates.
+
+**Borrower Rate / Loan Amount / Prosper Score**
+
+```{r echo=FALSE, "Borrower Rate vs Loan Amount by Prosper Score"}
+ggplot(aes(x=BorrowerRate, y = LoanOriginalAmount), data = loansAfter_01_07_09) +
+  geom_point(alpha = 1/20) +
+  ggtitle("Borrower Rate vs Loan Amount vs  for different Prosper Scores") +
+  ylab("Loan Amount") +
+  xlab("Borrower Rate")  +
+  facet_wrap(~ProsperScore, ncol=3,  scales = "free")  +
+  xlim(0, 0.4) +
+  ylim(0, 35000)
+
+summary(loan_df$ProsperScore)
+```
+
+Higher Prosper Score leads to Lower Borrower rate.
+
+
+----------------------------------------------------
+
+# Multivariate Analysis
+
+# Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+
+Lower borrowing Rates are usually related to High Credit Score, High Prosper Score, High Prosper Rating and the fact that Borrower owns a Home.
+Borrowers with Lower Prosper Rating usually borrow less amount but on a high rate. 
+Most of the borrowers have credit scores near 700. Higher Income Range and Higher Prosper Rating leads to Low Borrowing Rate.
+
+
+# Were there any interesting or surprising interactions between features?
+
+Most of the results were as expected.
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the strengths and limitations of your model.
+
+------
+
+# Final Plots and Summary
+
+# Plot One
+```{r echo=FALSE, "Plot One"}
+ggplot(aes(x = CategoryNameList), data = loan_df) + 
+  stat_count(color='black', fill='#B1C192') +
+  ggtitle("What people borrow money for?") +
+  xlab("The Purpose of the Loans") +
+  ylab("Number of loans") +
+  theme(text = element_text(size=12), 
+        axis.text.x = element_text(angle=90, vjust=1))  
+
+```
+
+### Description One
+
+In this plot we can see that the major part of the loans are classified under debt consolidation. 58308 loans (~51%) are under debt consolidation category. 
+
+A few factors contribute to the above statement. 
+
+1. Consolidating other high interest loans into one Prosper debt consolidation loan with a higher rate leads to saving of amount of interest that is charged on other debts every month.
+
+2. Prosper debt consolidation loans are quite popular. The reason might be that they have a fixed interest rate.
+
+3. Borrowers do not need to own a home for debt consolidation according to Proper's policy of sanctioning loans.
+
+
+### Plot Two
+
+```{r echo=FALSE, "Plot Two"}
+ggplot(aes(x = as.factor(ProsperScore), y = Investors), 
+       data = loansAfter_01_07_09) + 
+  geom_boxplot() +
+  ggtitle("Prosper Score vs Number of Investors") +
+  xlab("Prosper Score") +
+  ylab("Number of Investors")
+
+```
+
+### Description Two
+
+Higher Prosper Score tends to attract more investors to invest in one loan. Mean and median increases as Prosper score is increasing. The maximum is achieved at the Prosper score of 10. The 3rd quartile for every Prosper score is less than 250 investors. We can notice four outliers that are loans with number of investors larger than 1000. 
+
+The maximum difference between number of investors falling between the First and the Third quartile is for the score of 10 where we have 
+value of 1 for the First quartile and value of 206 for Third quartile.
+
+The plots have been made as a subset of all loans created after July 1st, 2009 (loansAfter_01_07_09).
+
+
+### Plot Three
+
+```{r echo=FALSE, Plot_Three}
+ggplot(aes(x = as.factor(ProsperScore), y = BorrowerRate), 
+       data=loansAfter_01_07_09) +
+  geom_boxplot(aes(fill = IsBorrowerHomeowner)) +
+  ggtitle("Prosper Score vs Borrower Rate by Home Owner") +
+  guides(fill = guide_legend(title = "Is Borrower Homeowner")) +
+  xlab("Prosper Score") +
+  ylab("Borrower Rate") 
+```
+
+### Description Three
+We can observe and notice that Higher Prosper Scores and being Owner of a home tends to lead to a Lower Borrower Rate. Owning home will provide anyone with better Borrower Rates. 
+
+The plots have been made as a subset of all loans created after July 1st, 2009 (loansAfter_01_07_09).
+
+------------------------------------------------------------------
+
+# Reflection
+
+This project gave me an in-depth knowledge about Prosper and its working as a Business. Exploring 113937 observations with more than 80 variables for each of them helped me realize how great the term, "ANALYSIS" is. I spent a lot of time on their website and went through the variables in their dataset as well. This process was quite tiresome initially but became interesting near the end. 
+
+Much of the difficulties came in the form - "Now, what to do next?". Being completely unaware about the 2008-09 Economic Crisis, I wasn't able to analyze the drop properly. It wasn't until I researched, I was able to finally come to the point of conclusion.
+
+Making comparisons between Proper Scores and several other variables made me realize how immportant the Proper Scores are in determining the relations between Borrowers and the actual Loans. That is why excluding the results before July 1st, 2009 was a better idea. Although, this in itself seems quite amusing how the analysis would have been carried for the values before the stated date.
+
+For the future (including short-term and long-term goals), I am planing to analyze variables and the parameters that I didn't cover or maybe, missed out in this particular analysis. I'll sure learn more about this dataset than I already know so far. It would be better if I can get the latest dataset of Prosper. Since their last update was in 2014. 4 more years worth of data can easily help me to achieve the above and also help me to perform better Analysis. The main aim of this project was Exploratory Analysis. I plan to further my knowledge in this particular topic and go ahead with Predictive Models as well i.e. Predicting a pattern based on existing Relationships in Prosper data.
+
+After getting all these analysis seems a bit easier than before. This also made me realize that there's a lot more learn and practice.
+
+----------------------------------------------------------------------
+
+# References
+
+1. https://earthdatascience.org/courses/earth-analytics/document-your-science/knit-rmarkdown-document-to-pdf/
+2. http://tutorials.iq.harvard.edu/R/Rgraphics/Rgraphics.html
+3. Udacity Video Lectures and links provided as reference 
+4. http://ggplot2.tidyverse.org/reference/scale_hue.html
